@@ -1,0 +1,26 @@
+version: "3"
+services:
+  redis:
+    container_name: "squad_redis"
+    hostname: "squad-redis"
+    image: "redis:latest"
+    ports:
+      - "6379:6379"
+    volumes:
+      - "./data/redis:/data"
+    restart: always
+    tty: true
+    networks:
+      - squadbot
+
+  go:
+    container_name: "squad_go"
+    build: .
+    restart: always
+    tty: true
+    networks:
+      - squadbot
+
+networks:
+  squadbot:
+    driver: bridge

@@ -1,0 +1,5 @@
+.env
+*.ini
+ps2botgo
+main
+data/
