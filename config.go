@@ -6,7 +6,7 @@ import (
 	"regexp"
 
 	"github.com/bwmarrin/discordgo"
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v8"
 	_ "github.com/go-sql-driver/mysql"
 )
 
@@ -142,6 +142,7 @@ func sendTextMessage(s *discordgo.Session, i *discordgo.InteractionCreate, text 
 	} else if t == "notice" {
 		color = 0x00ff00
 	}
+
 	embed := &discordgo.MessageEmbed{
 		Author:      &discordgo.MessageEmbedAuthor{},
 		Color:       color,
@@ -158,10 +159,11 @@ func sendTextMessage(s *discordgo.Session, i *discordgo.InteractionCreate, text 
 
 func addLobbyChannel(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	val, err := rConfigClient.Get(ctx, i.GuildID).Bytes()
+
 	key := i.GuildID
 	chid := i.ApplicationCommandData().Options[0].Value.(string)
 	ch, _ := s.Channel(chid)
-	if err == redis.Nil {
+	if err == redis.Nil || fmt.Sprintf("%s", err) == "redis: nil" {
 		sc := &ServerConfig{
 			VoiceChannelID: chid,
 			ParentID:       ch.ParentID,
@@ -189,14 +191,22 @@ func addLobbyChannel(s *discordgo.Session, i *discordgo.InteractionCreate) {
 
 func delLobbyChannel(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	key := i.GuildID
-	_, err := rConfigClient.Get(ctx, i.GuildID).Bytes()
-	if err == redis.Nil {
+	val, err := rConfigClient.Get(ctx, i.GuildID).Bytes()
+	if err == redis.Nil || fmt.Sprintf("%s", err) == "redis: nil" {
 		sendTextMessage(s, i, "登録されていません", "error")
 	} else if err != nil {
 		fmt.Println("redis.Client.Get Error:", err)
 		sendTextMessage(s, i, "Error", "error")
 	} else {
-		rConfigClient.Del(ctx, key)
+		deserialized := new(ServerConfig)
+		json.Unmarshal(val, deserialized)
+		sc := &ServerConfig{
+			VoiceChannelID: "",
+			ParentID:       "",
+			NameOption:     deserialized.NameOption,
+		}
+		serialized, _ := json.Marshal(sc)
+		rConfigClient.Set(ctx, key, serialized, 0)
 		sendTextMessage(s, i, "登録を解除しました", "notice")
 	}
 
@@ -206,7 +216,7 @@ func addOptionMessage(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	val, err := rConfigClient.Get(ctx, i.GuildID).Bytes()
 	key := i.GuildID
 	m := i.ApplicationCommandData().Options[0].Value.(string)
-	if err == redis.Nil {
+	if err == redis.Nil || fmt.Sprintf("%s", err) == "redis: nil" {
 		n := []string{}
 		n = append(n, m)
 		sc := &ServerConfig{
@@ -243,10 +253,10 @@ func addOptionMessage(s *discordgo.Session, i *discordgo.InteractionCreate) {
 }
 
 func delOptionMessage(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	val, err := rConfigClient.Get(ctx, i.GuildID).Bytes()
 	key := i.GuildID
+	val, err := rConfigClient.Get(ctx, key).Bytes()
 	id := int(i.ApplicationCommandData().Options[0].Value.(float64))
-	if err == redis.Nil {
+	if err == redis.Nil || fmt.Sprintf("%s", err) == "redis: nil" {
 		sendTextMessage(s, i, "登録されていません", "error")
 	} else if err != nil {
 		fmt.Println("redis.Client.Get Error:", err)
@@ -275,7 +285,7 @@ func delOptionMessage(s *discordgo.Session, i *discordgo.InteractionCreate) {
 
 func showOptionMessages(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	val, err := rConfigClient.Get(ctx, i.GuildID).Bytes()
-	if err == redis.Nil {
+	if err == redis.Nil || fmt.Sprintf("%s", err) == "redis: nil" {
 		sendTextMessage(s, i, "登録されていません", "error")
 	} else if err != nil {
 		fmt.Println("redis.Client.Get Error:", err)
@@ -299,7 +309,7 @@ func showOptionMessages(s *discordgo.Session, i *discordgo.InteractionCreate) {
 func getStatus(s *discordgo.Session, i *discordgo.InteractionCreate) string {
 	msg := ""
 	val, err := rConfigClient.Get(ctx, i.GuildID).Bytes()
-	if err == redis.Nil {
+	if err == redis.Nil || fmt.Sprintf("%s", err) == "redis: nil" {
 		msg = "登録されていません"
 	} else if err != nil {
 		fmt.Println("redis.Client.Get Error:", err)
@@ -309,14 +319,14 @@ func getStatus(s *discordgo.Session, i *discordgo.InteractionCreate) string {
 		json.Unmarshal(val, deserialized)
 		lobby := "__ロビーチャンネル__\n"
 		if deserialized.VoiceChannelID == "" {
-			lobby = "登録されていません\n\n"
+			lobby += "登録されていません\n\n"
 		} else {
 			ch, _ := s.Channel(deserialized.VoiceChannelID)
 			lobby += fmt.Sprintf("%s\n\n", ch.Mention())
 		}
 		opt := "__メッセージオプション__\n"
 		if len(deserialized.NameOption) == 0 {
-			opt = "登録されていません\n"
+			opt += "登録されていません\n"
 		} else {
 			for i, v := range deserialized.NameOption {
 				opt += fmt.Sprintf("%s:  %s\n", emojis[i], v)
@@ -325,6 +335,5 @@ func getStatus(s *discordgo.Session, i *discordgo.InteractionCreate) string {
 		}
 		msg = lobby + opt
 	}
-	fmt.Println(msg)
 	return msg
 }

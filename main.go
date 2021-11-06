@@ -113,7 +113,7 @@ func createSquad(s *discordgo.Session, vs *discordgo.VoiceStateUpdate, catid str
 	temp := "<@!%s> \n 小隊が編成されました。\n名前を選択してください\n"
 	val, err := rConfigClient.Get(ctx, vs.GuildID).Bytes()
 	n := ""
-	if err == redis.Nil {
+	if err == redis.Nil || fmt.Sprintf("%s", err) == "redis: nil" {
 		n = "名前は登録されていません"
 	} else if err != nil {
 		fmt.Println("redis.Client.Get Error:", err)
@@ -139,7 +139,7 @@ func createSquad(s *discordgo.Session, vs *discordgo.VoiceStateUpdate, catid str
 		fmt.Println(err)
 	}
 	cval, err := rConfigClient.Get(ctx, vs.GuildID).Bytes()
-	if err == redis.Nil {
+	if err == redis.Nil || fmt.Sprintf("%s", err) == "redis: nil" {
 		return
 	} else if err != nil {
 		fmt.Println("redis.Client.Get Error:", err)
@@ -188,7 +188,7 @@ func onMessageReactionAdd(s *discordgo.Session, r *discordgo.MessageReactionAdd)
 	for _, k := range sq {
 		val, err := rSquadClient.Get(ctx, k).Bytes()
 		cval, err := rConfigClient.Get(ctx, r.GuildID).Bytes()
-		if err == redis.Nil {
+		if err == redis.Nil || fmt.Sprintf("%s", err) == "redis: nil" {
 			return
 		} else if err != nil {
 			fmt.Println("redis.Client.Get Error:", err)
@@ -198,7 +198,6 @@ func onMessageReactionAdd(s *discordgo.Session, r *discordgo.MessageReactionAdd)
 			json.Unmarshal(val, ds)
 			json.Unmarshal(cval, dc)
 			if ds.MessageID == messageID {
-
 				for i, v := range emojis {
 					if v == r.Emoji.Name {
 						name := dc.NameOption[i]
@@ -215,7 +214,7 @@ func onMessageReactionAdd(s *discordgo.Session, r *discordgo.MessageReactionAdd)
 func voiceStateUpdate(s *discordgo.Session, vs *discordgo.VoiceStateUpdate) {
 	// ロビーに入室→Squad作成
 	val, err := rConfigClient.Get(ctx, vs.GuildID).Bytes()
-	if err == redis.Nil {
+	if err == redis.Nil || fmt.Sprintf("%s", err) == "redis: nil" {
 		fmt.Println("redis.Client.Get Error:", err)
 	} else if err != nil {
 		fmt.Println("redis.Client.Get Error:", err)
@@ -247,12 +246,13 @@ func voiceStateUpdate(s *discordgo.Session, vs *discordgo.VoiceStateUpdate) {
 		for _, v := range voiceStateList {
 			if vs.BeforeUpdate != nil && v.ChannelID == vs.BeforeUpdate.ChannelID {
 				count++
+				break
 			}
 		}
 		if count == 0 {
 			// 削除
 			val, err := rSquadClient.Get(ctx, vs.GuildID+"/"+vs.BeforeUpdate.ChannelID).Bytes()
-			if err == redis.Nil {
+			if err == redis.Nil || fmt.Sprintf("%s", err) == "redis: nil" {
 				fmt.Println("redis.Client.Get Error:", err)
 			} else if err != nil {
 				fmt.Println("redis.Client.Get Error:", err)
