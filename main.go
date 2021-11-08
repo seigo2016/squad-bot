@@ -8,7 +8,6 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/go-redis/redis/v8"
-	_ "github.com/go-sql-driver/mysql"
 	"github.com/joho/godotenv"
 )
 
@@ -43,7 +42,7 @@ func main() {
 	stopBot := make(chan bool)
 	discord, err := discordgo.New("Bot " + token)
 	if err != nil {
-		fmt.Println("error Start", err)
+		fmt.Println("Failed to Start bot ", err)
 	}
 	rSquadClient = redis.NewClient(&redis.Options{
 		Addr:     dbhost,
@@ -67,7 +66,7 @@ func main() {
 	discord.AddHandler(onMessageReactionAdd)
 	err = discord.Open()
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("Failed to Connect to Discord ", err)
 	}
 	defer discord.Close()
 	fmt.Println("Listening...")
@@ -79,7 +78,7 @@ func ready(s *discordgo.Session, event *discordgo.Ready) {
 	for _, v := range commands {
 		_, err := s.ApplicationCommandCreate(s.State.User.ID, "", v)
 		if err != nil {
-			fmt.Println(err)
+			fmt.Println("Failed to Create Application Command ", err)
 		}
 	}
 }
@@ -104,11 +103,11 @@ func createSquad(s *discordgo.Session, vs *discordgo.VoiceStateUpdate, catid str
 	}
 	tst, err := s.GuildChannelCreateComplex(vs.GuildID, tChData)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Printf("Failed to Create Squad Text Channel (GuildID:%s) %s\n", vs.GuildID, err)
 	}
 	vst, err := s.GuildChannelCreateComplex(vs.GuildID, vChData)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Printf("Failed to Create Squad Voice Channel (GuildID:%s) %s\n", vs.GuildID, err)
 	}
 	temp := "<@!%s> \n 小隊が編成されました。\n名前を選択してください\n"
 	val, err := rConfigClient.Get(ctx, vs.GuildID).Bytes()
@@ -116,8 +115,8 @@ func createSquad(s *discordgo.Session, vs *discordgo.VoiceStateUpdate, catid str
 	if err == redis.Nil || fmt.Sprintf("%s", err) == "redis: nil" {
 		n = "名前は登録されていません"
 	} else if err != nil {
-		fmt.Println("redis.Client.Get Error:", err)
-		n = "Error"
+		fmt.Println("redis.Client.Get Error ", err)
+		n = "データベースError"
 	} else {
 
 		deserialized := new(ServerConfig)
@@ -142,7 +141,7 @@ func createSquad(s *discordgo.Session, vs *discordgo.VoiceStateUpdate, catid str
 	if err == redis.Nil || fmt.Sprintf("%s", err) == "redis: nil" {
 		return
 	} else if err != nil {
-		fmt.Println("redis.Client.Get Error:", err)
+		fmt.Println("redis.Client.Get Error ", err)
 	} else {
 		dc := new(ServerConfig)
 		json.Unmarshal(cval, dc)
@@ -152,7 +151,7 @@ func createSquad(s *discordgo.Session, vs *discordgo.VoiceStateUpdate, catid str
 	}
 	err = s.GuildMemberMove(vs.GuildID, vs.UserID, &vst.ID)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("Failed to Move a Member", err)
 	}
 	squad := &SquadInfo{
 		VoiceChannelID: vst.ID,
@@ -164,7 +163,7 @@ func createSquad(s *discordgo.Session, vs *discordgo.VoiceStateUpdate, catid str
 	key := vs.GuildID + "/" + vst.ID
 	err = rSquadClient.Set(ctx, key, string(serialized), 0).Err()
 	if err != nil {
-		fmt.Println("redis.Client.Set Error:", err)
+		fmt.Println("redis.Client.Set Error ", err)
 	}
 }
 
@@ -178,7 +177,7 @@ func editChannelName(key, name string, deserialized *SquadInfo, rSquadClient *re
 	serialized, _ := json.Marshal(squad)
 	err := rSquadClient.Set(ctx, key, string(serialized), 0).Err()
 	if err != nil {
-		fmt.Println("redis.Client.Set Error:", err)
+		fmt.Println("redis.Client.Set Error ", err)
 	}
 }
 
@@ -191,7 +190,7 @@ func onMessageReactionAdd(s *discordgo.Session, r *discordgo.MessageReactionAdd)
 		if err == redis.Nil || fmt.Sprintf("%s", err) == "redis: nil" {
 			return
 		} else if err != nil {
-			fmt.Println("redis.Client.Get Error:", err)
+			fmt.Println("redis.Client.Get Error ", err)
 		} else {
 			ds := new(SquadInfo)
 			dc := new(ServerConfig)
@@ -215,9 +214,9 @@ func voiceStateUpdate(s *discordgo.Session, vs *discordgo.VoiceStateUpdate) {
 	// ロビーに入室→Squad作成
 	val, err := rConfigClient.Get(ctx, vs.GuildID).Bytes()
 	if err == redis.Nil || fmt.Sprintf("%s", err) == "redis: nil" {
-		fmt.Println("redis.Client.Get Error:", err)
+		fmt.Println("redis.Client.Get Error ", err)
 	} else if err != nil {
-		fmt.Println("redis.Client.Get Error:", err)
+		fmt.Println("redis.Client.Get Error ", err)
 	} else {
 		deserialized := new(ServerConfig)
 		json.Unmarshal(val, deserialized)
@@ -238,7 +237,7 @@ func voiceStateUpdate(s *discordgo.Session, vs *discordgo.VoiceStateUpdate) {
 		if err != redis.Nil {
 			voiceStateList = append(voiceStateList, vs.VoiceState)
 		} else if err != nil {
-			fmt.Println("redis.Client.Get Error:", err)
+			fmt.Println("redis.Client.Get Error ", err)
 		}
 	} else if vs.ChannelID == "" {
 		// 該当チャンネルのメンバーが0なら削除
@@ -253,9 +252,9 @@ func voiceStateUpdate(s *discordgo.Session, vs *discordgo.VoiceStateUpdate) {
 			// 削除
 			val, err := rSquadClient.Get(ctx, vs.GuildID+"/"+vs.BeforeUpdate.ChannelID).Bytes()
 			if err == redis.Nil || fmt.Sprintf("%s", err) == "redis: nil" {
-				fmt.Println("redis.Client.Get Error:", err)
+				fmt.Println("redis.Client.Get Error ", err)
 			} else if err != nil {
-				fmt.Println("redis.Client.Get Error:", err)
+				fmt.Println("redis.Client.Get Error ", err)
 			} else {
 				deserialized := new(SquadInfo)
 				json.Unmarshal(val, deserialized)

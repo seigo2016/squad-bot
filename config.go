@@ -7,7 +7,6 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/go-redis/redis/v8"
-	_ "github.com/go-sql-driver/mysql"
 )
 
 var (
@@ -172,7 +171,7 @@ func addLobbyChannel(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		serialized, _ := json.Marshal(sc)
 		rConfigClient.Set(ctx, key, serialized, 0)
 	} else if err != nil {
-		fmt.Println("redis.Client.Get Error:", err)
+		fmt.Println("redis.Client.Get Error ", err)
 		sendTextMessage(s, i, "Error", "error")
 		return
 	} else {
@@ -195,7 +194,7 @@ func delLobbyChannel(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	if err == redis.Nil || fmt.Sprintf("%s", err) == "redis: nil" {
 		sendTextMessage(s, i, "登録されていません", "error")
 	} else if err != nil {
-		fmt.Println("redis.Client.Get Error:", err)
+		fmt.Println("redis.Client.Get Error ", err)
 		sendTextMessage(s, i, "Error", "error")
 	} else {
 		deserialized := new(ServerConfig)
@@ -227,12 +226,12 @@ func addOptionMessage(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		serialized, _ := json.Marshal(sc)
 		rConfigClient.Set(ctx, key, serialized, 0)
 	} else if err != nil {
-		fmt.Println("redis.Client.Get Error:", err)
+		fmt.Println("redis.Client.Get Error ", err)
 		sendTextMessage(s, i, "Error", "error")
 	} else {
 		f, err := regexp.MatchString("^[0-9a-zA-Z]+$", m)
 		if err != nil {
-			fmt.Println(err)
+			fmt.Printf("%s is invalid Option Message %s\n", m, err)
 		}
 		if f {
 			deserialized := new(ServerConfig)
@@ -259,7 +258,7 @@ func delOptionMessage(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	if err == redis.Nil || fmt.Sprintf("%s", err) == "redis: nil" {
 		sendTextMessage(s, i, "登録されていません", "error")
 	} else if err != nil {
-		fmt.Println("redis.Client.Get Error:", err)
+		fmt.Println("redis.Client.Get Error ", err)
 		sendTextMessage(s, i, "Error", "error")
 		return
 	} else {
@@ -288,7 +287,7 @@ func showOptionMessages(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	if err == redis.Nil || fmt.Sprintf("%s", err) == "redis: nil" {
 		sendTextMessage(s, i, "登録されていません", "error")
 	} else if err != nil {
-		fmt.Println("redis.Client.Get Error:", err)
+		fmt.Println("redis.Client.Get Error ", err)
 		sendTextMessage(s, i, "Error", "error")
 	} else {
 
@@ -312,7 +311,7 @@ func getStatus(s *discordgo.Session, i *discordgo.InteractionCreate) string {
 	if err == redis.Nil || fmt.Sprintf("%s", err) == "redis: nil" {
 		msg = "登録されていません"
 	} else if err != nil {
-		fmt.Println("redis.Client.Get Error:", err)
+		fmt.Println("redis.Client.Get Error ", err)
 		msg = "Error"
 	} else {
 		deserialized := new(ServerConfig)
