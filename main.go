@@ -118,7 +118,6 @@ func createSquad(s *discordgo.Session, vs *discordgo.VoiceStateUpdate, catid str
 		fmt.Println("redis.Client.Get Error ", err)
 		n = "データベースError"
 	} else {
-
 		deserialized := new(ServerConfig)
 		json.Unmarshal(val, deserialized)
 		msg := ""
@@ -142,12 +141,12 @@ func createSquad(s *discordgo.Session, vs *discordgo.VoiceStateUpdate, catid str
 		return
 	} else if err != nil {
 		fmt.Println("redis.Client.Get Error ", err)
-	} else {
-		dc := new(ServerConfig)
-		json.Unmarshal(cval, dc)
-		for i, _ := range dc.NameOption {
-			s.MessageReactionAdd(msg.ChannelID, msg.ID, emojis[i])
-		}
+		return
+	}
+	dc := new(ServerConfig)
+	json.Unmarshal(cval, dc)
+	for i, _ := range dc.NameOption {
+		s.MessageReactionAdd(msg.ChannelID, msg.ID, emojis[i])
 	}
 	err = s.GuildMemberMove(vs.GuildID, vs.UserID, &vst.ID)
 	if err != nil {
@@ -191,20 +190,21 @@ func onMessageReactionAdd(s *discordgo.Session, r *discordgo.MessageReactionAdd)
 			return
 		} else if err != nil {
 			fmt.Println("redis.Client.Get Error ", err)
-		} else {
-			ds := new(SquadInfo)
-			dc := new(ServerConfig)
-			json.Unmarshal(val, ds)
-			json.Unmarshal(cval, dc)
-			if ds.MessageID == messageID {
-				for i, v := range emojis {
-					if v == r.Emoji.Name {
-						name := dc.NameOption[i]
-						editChannelName(k, name, ds, rSquadClient)
-						s.ChannelEdit(ds.TextChannelID, name)
-						s.ChannelEdit(ds.VoiceChannelID, name)
-					}
+			continue
+		}
+		ds := new(SquadInfo)
+		dc := new(ServerConfig)
+		json.Unmarshal(val, ds)
+		json.Unmarshal(cval, dc)
+		if ds.MessageID == messageID {
+			for i, v := range emojis {
+				if v != r.Emoji.Name {
+					continue
 				}
+				name := dc.NameOption[i]
+				editChannelName(k, name, ds, rSquadClient)
+				s.ChannelEdit(ds.TextChannelID, name)
+				s.ChannelEdit(ds.VoiceChannelID, name)
 			}
 		}
 	}
@@ -253,15 +253,16 @@ func voiceStateUpdate(s *discordgo.Session, vs *discordgo.VoiceStateUpdate) {
 			val, err := rSquadClient.Get(ctx, vs.GuildID+"/"+vs.BeforeUpdate.ChannelID).Bytes()
 			if err == redis.Nil || fmt.Sprintf("%s", err) == "redis: nil" {
 				fmt.Println("redis.Client.Get Error ", err)
+				return
 			} else if err != nil {
-				fmt.Println("redis.Client.Get Error ", err)
-			} else {
-				deserialized := new(SquadInfo)
-				json.Unmarshal(val, deserialized)
-				s.ChannelDelete(deserialized.VoiceChannelID)
-				s.ChannelDelete(deserialized.TextChannelID)
-				rSquadClient.Del(ctx, vs.GuildID+"/"+vs.BeforeUpdate.ChannelID)
+				fmt.Println("redis Error ", err)
+				return
 			}
+			deserialized := new(SquadInfo)
+			json.Unmarshal(val, deserialized)
+			s.ChannelDelete(deserialized.VoiceChannelID)
+			s.ChannelDelete(deserialized.TextChannelID)
+			rSquadClient.Del(ctx, vs.GuildID+"/"+vs.BeforeUpdate.ChannelID)
 		}
 	}
 }
